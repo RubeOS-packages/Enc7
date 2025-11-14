@@ -1,165 +1,194 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import type { Process, SystemMetricPoint, LogEntry } from '../types';
-import { mockDataService } from '../services/appServices';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { MonitoredEndpoint } from '../types';
 
-// --- SVG Chart Components (built for this dashboard) ---
+// --- New System Info Widget ---
+interface SysInfo {
+  os: string;
+  browser: string;
+  cpuCores?: number;
+  memory?: number; // in GB
+  resolution: string;
+}
 
-const ChartWidget: React.FC<{ title: string; data: SystemMetricPoint[]; color: string }> = React.memo(({ title, data, color }) => {
-    const SvgPath = useMemo(() => {
-        if (data.length < 2) return '';
-        const width = 300;
-        const height = 100;
-        const points = data.map((p, i) => {
-            const x = (i / (data.length - 1)) * width;
-            const y = height - (p.value / 100) * height;
-            return `${x.toFixed(2)},${y.toFixed(2)}`;
+const InfoItem: React.FC<{ label: string; value: string | number | undefined }> = ({ label, value }) => (
+    <li className="flex justify-between items-baseline py-1.5 border-b border-slate-700/50">
+        <span className="text-slate-400">{label}</span>
+        <span className="font-mono text-slate-200">{value || 'N/A'}</span>
+    </li>
+);
+
+const SystemInformation: React.FC = () => {
+    const [info, setInfo] = useState<SysInfo | null>(null);
+
+    useEffect(() => {
+        const ua = navigator.userAgent;
+        let os = "Unknown OS";
+        if (ua.includes("Win")) os = "Windows";
+        if (ua.includes("Mac")) os = "MacOS";
+        if (ua.includes("Linux")) os = "Linux";
+        if (ua.includes("Android")) os = "Android";
+        if (ua.includes("like Mac") && ua.includes("iPhone")) os = "iOS";
+
+        let browser = "Unknown Browser";
+        if (ua.includes("Chrome") && !ua.includes("Edg")) browser = "Chrome";
+        else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
+        else if (ua.includes("Firefox")) browser = "Firefox";
+        else if (ua.includes("Edg")) browser = "Edge";
+        
+        // @ts-ignore - deviceMemory is experimental and not in all TS lib versions
+        const memory = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : undefined;
+
+        setInfo({
+            os,
+            browser,
+            cpuCores: navigator.hardwareConcurrency,
+            // @ts-ignore
+            memory: navigator.deviceMemory,
+            resolution: `${window.screen.width}x${window.screen.height}`
         });
-        return `M${points[0]} L${points.slice(1).join(' ')}`;
-    }, [data]);
+    }, []);
 
-    const latestValue = data.length > 0 ? data[data.length - 1].value.toFixed(1) : '0.0';
+    if (!info) return null;
 
     return (
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex flex-col h-full">
-            <div className="flex justify-between items-center mb-2">
-                <h3 className="text-slate-300 font-semibold">{title}</h3>
-                <span className={`text-2xl font-bold text-${color}-400`}>{latestValue}%</span>
+            <h3 className="text-slate-300 font-semibold mb-2">System Information</h3>
+            <div className="flex-grow">
+                <ul className="space-y-1 text-sm">
+                    <InfoItem label="Operating System" value={info.os} />
+                    <InfoItem label="Browser" value={info.browser} />
+                    <InfoItem label="Logical CPU Cores" value={info.cpuCores} />
+                    <InfoItem label="Device Memory (Approx.)" value={info.memory ? `${info.memory} GB` : undefined} />
+                    <InfoItem label="Screen Resolution" value={info.resolution} />
+                </ul>
             </div>
-            <div className="flex-grow flex items-center justify-center">
-                <svg viewBox="0 0 300 100" className="w-full h-full" preserveAspectRatio="none">
-                    <path d={SvgPath} stroke={`url(#gradient-${color})`} strokeWidth="2" fill="none" />
-                    <defs>
-                        <linearGradient id={`gradient-${color}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor={color === 'cyan' ? '#22d3ee' : '#4ade80'} stopOpacity="0" />
-                            <stop offset="100%" stopColor={color === 'cyan' ? '#22d3ee' : '#4ade80'} />
-                        </linearGradient>
-                    </defs>
-                </svg>
-            </div>
-        </div>
-    );
-});
-
-const RadialWidget: React.FC<{ title: string; value: number; color: string }> = React.memo(({ title, value, color }) => {
-    const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
-        const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
-        return {
-            x: centerX + (radius * Math.cos(angleInRadians)),
-            y: centerY + (radius * Math.sin(angleInRadians))
-        };
-    };
-
-    const describeArc = (x: number, y: number, radius: number, startAngle: number, endAngle: number) => {
-        const start = polarToCartesian(x, y, radius, endAngle);
-        const end = polarToCartesian(x, y, radius, startAngle);
-        const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-        return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
-    };
-    
-    const angle = (value / 100) * 359.99;
-    const arcPath = describeArc(50, 50, 40, 0, angle);
-
-    return (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex flex-col items-center justify-center h-full">
-            <h3 className="text-slate-300 font-semibold mb-2">{title}</h3>
-            <div className="relative w-32 h-32">
-                 <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
-                    <circle cx="50" cy="50" r="40" strokeWidth="10" stroke="#334155" fill="none" />
-                    <path d={arcPath} strokeWidth="10" stroke={color === 'sky' ? '#38bdf8' : '#fb923c'} fill="none" strokeLinecap="round" />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className={`text-3xl font-bold text-${color}-400`}>{value.toFixed(0)}%</span>
-                </div>
+            <div className="mt-4 p-3 bg-slate-900/50 rounded-md text-xs text-slate-400">
+                <p>
+                    <strong className="text-slate-300">Note:</strong> Live metrics like real-time CPU/Memory usage require native system access, which browsers restrict for security. A native companion app is needed to display performance data.
+                </p>
             </div>
         </div>
     );
-});
+};
 
 
 const Dashboard: React.FC = () => {
-    const [cpuData, setCpuData] = useState<SystemMetricPoint[]>([]);
-    const [memData, setMemData] = useState<SystemMetricPoint[]>([]);
-    const [diskIO, setDiskIO] = useState(0);
-    const [processes, setProcesses] = useState<Process[]>([]);
-    const [logs, setLogs] = useState<LogEntry[]>([]);
-    const [selectedProcess, setSelectedProcess] = useState<Process | null>(null);
+    const [urlInput, setUrlInput] = useState('https://api.aistudio.google.com/v1');
+    const [monitoredEndpoints, setMonitoredEndpoints] = useState<MonitoredEndpoint[]>([]);
+    const [selectedEndpoint, setSelectedEndpoint] = useState<MonitoredEndpoint | null>(null);
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const now = Date.now();
-            setCpuData(prev => [...prev.slice(-29), { time: now, value: mockDataService.getMetricValue() }].sort((a,b) => a.time - b.time));
-            setMemData(prev => [...prev.slice(-29), { time: now, value: mockDataService.getMetricValue(30, 80) }].sort((a,b) => a.time - b.time));
-            setDiskIO(mockDataService.getMetricValue(5, 95));
-            setProcesses(mockDataService.getProcesses());
-            
-            const newLog = mockDataService.getLogEntry();
-            if (newLog) {
-                 setLogs(prev => [newLog, ...prev.slice(0, 49)]);
-            }
+    const handlePing = useCallback(async () => {
+        if (!urlInput.trim()) return;
 
-        }, 2000);
-
-        // Initial data
-        const initialTime = Date.now();
-        const initialCpu: SystemMetricPoint[] = [];
-        const initialMem: SystemMetricPoint[] = [];
-        for(let i = 29; i >= 0; i--) {
-            initialCpu.push({time: initialTime - i*2000, value: mockDataService.getMetricValue()});
-            initialMem.push({time: initialTime - i*2000, value: mockDataService.getMetricValue(30, 80)});
+        let url = urlInput.trim();
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            url = `https://${url}`;
         }
-        setCpuData(initialCpu);
-        setMemData(initialMem);
-        setProcesses(mockDataService.getProcesses());
-        setLogs(Array.from({length: 10}, () => mockDataService.getLogEntry(true)!));
 
+        const endpointId = Date.now().toString();
+        const newEndpoint: MonitoredEndpoint = {
+            id: endpointId,
+            url,
+            status: 'Pending',
+            timestamp: new Date().toLocaleTimeString(),
+        };
+        
+        setMonitoredEndpoints(prev => [newEndpoint, ...prev].slice(0, 50)); // Keep last 50
+        setUrlInput('');
 
-        return () => clearInterval(interval);
-    }, []);
+        const startTime = Date.now();
+        try {
+            // NOTE: This fetch request is subject to CORS policy.
+            const response = await fetch(url, { mode: 'cors' });
+            const latency = Date.now() - startTime;
+            const body = await response.text();
+            
+            const headers: Record<string, string> = {};
+            response.headers.forEach((value, key) => {
+                headers[key] = value;
+            });
 
-    const getLogLevelColor = (level: 'INFO' | 'WARN' | 'ERROR') => {
-        switch (level) {
-            case 'INFO': return 'text-sky-400';
-            case 'WARN': return 'text-yellow-400';
-            case 'ERROR': return 'text-red-400';
+            const updatedEndpoint: MonitoredEndpoint = {
+                ...newEndpoint,
+                status: response.ok ? 'OK' : 'Error',
+                statusCode: response.status,
+                latency,
+                bodyPreview: body.substring(0, 500),
+                headers
+            };
+            setMonitoredEndpoints(prev => prev.map(e => e.id === endpointId ? updatedEndpoint : e));
+        } catch (error: any) {
+             const latency = Date.now() - startTime;
+             const errorMessage = error.message.includes('Failed to fetch') 
+                ? 'Network Error (Check CORS or connectivity)'
+                : error.message;
+
+             const updatedEndpoint: MonitoredEndpoint = {
+                ...newEndpoint,
+                status: 'Error',
+                latency,
+                error: errorMessage,
+            };
+             setMonitoredEndpoints(prev => prev.map(e => e.id === endpointId ? updatedEndpoint : e));
+        }
+    }, [urlInput]);
+
+    const getStatusColor = (status: 'OK' | 'Error' | 'Pending') => {
+        switch (status) {
+            case 'OK': return 'bg-green-500/20 text-green-400';
+            case 'Error': return 'bg-red-500/20 text-red-400';
+            case 'Pending': return 'bg-yellow-500/20 text-yellow-400';
         }
     };
 
     return (
-        <div className="max-w-7xl mx-auto h-full">
-            <header className="mb-6">
+        <div className="max-w-7xl mx-auto h-full flex flex-col">
+            <header className="mb-6 flex-shrink-0">
                 <h2 className="text-2xl font-bold text-slate-100">System Dashboard</h2>
             </header>
 
-            <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-2"><ChartWidget title="CPU Usage" data={cpuData} color="cyan" /></div>
-                <div className="lg:col-span-2"><ChartWidget title="Memory Usage" data={memData} color="green" /></div>
+            <main className="flex-grow flex flex-col lg:flex-row gap-6 min-h-0">
+                <div className="lg:w-[400px] flex-shrink-0">
+                  <SystemInformation />
+                </div>
                 
-                <div className="lg:col-span-3">
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 h-[28rem]">
-                         <h3 className="text-slate-300 font-semibold mb-3">Running Processes</h3>
-                         <div className="overflow-y-auto h-[calc(28rem-3rem)]">
+                <div className="flex-grow min-w-0">
+                     <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 h-full flex flex-col">
+                         <h3 className="text-slate-300 font-semibold mb-3 flex-shrink-0">Live Network Monitor</h3>
+                         <div className="flex gap-2 mb-3 flex-shrink-0">
+                            <input
+                                type="text"
+                                value={urlInput}
+                                onChange={e => setUrlInput(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && handlePing()}
+                                placeholder="Enter a URL to monitor..."
+                                className="flex-grow p-2 bg-slate-900 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition"
+                            />
+                            <button onClick={handlePing} className="px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                                Ping
+                            </button>
+                         </div>
+                         <div className="flex-grow overflow-y-auto min-h-0">
                             <table className="w-full text-left text-sm">
-                              <thead className="sticky top-0 bg-slate-800/50 backdrop-blur-sm">
+                              <thead className="sticky top-0 bg-slate-800/80 backdrop-blur-sm">
                                 <tr>
-                                  <th className="p-2 text-slate-400 font-medium">PID</th>
-                                  <th className="p-2 text-slate-400 font-medium">Process Name</th>
-                                  <th className="p-2 text-slate-400 font-medium">User</th>
-                                  <th className="p-2 text-slate-400 font-medium text-right">CPU %</th>
-                                  <th className="p-2 text-slate-400 font-medium text-right">Mem %</th>
+                                  <th className="p-2 text-slate-400 font-medium">URL</th>
                                   <th className="p-2 text-slate-400 font-medium">Status</th>
+                                  <th className="p-2 text-slate-400 font-medium text-right">Latency</th>
                                   <th className="p-2 text-slate-400 font-medium"></th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-700/50">
-                                {processes.map(p => (
-                                  <tr key={p.pid} className="hover:bg-slate-700/30">
-                                    <td className="p-2 font-mono">{p.pid}</td>
-                                    <td className="p-2 font-mono">{p.name}</td>
-                                    <td className="p-2">{p.user}</td>
-                                    <td className="p-2 font-mono text-right">{p.cpu.toFixed(2)}</td>
-                                    <td className="p-2 font-mono text-right">{p.mem.toFixed(2)}</td>
-                                    <td className="p-2"><span className={`px-2 py-1 text-xs rounded-full ${p.status === 'Running' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{p.status}</span></td>
-                                    <td className="p-2 text-right"><button onClick={() => setSelectedProcess(p)} className="text-cyan-400 hover:text-cyan-300 text-xs">More Details</button></td>
+                                {monitoredEndpoints.map(e => (
+                                  <tr key={e.id} className="hover:bg-slate-700/30">
+                                    <td className="p-2 font-mono truncate max-w-xs">{e.url}</td>
+                                    <td className="p-2">
+                                        <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(e.status)}`}>
+                                            {e.status} {e.statusCode && `(${e.statusCode})`}
+                                        </span>
+                                    </td>
+                                    <td className="p-2 font-mono text-right">{e.latency != null ? `${e.latency}ms` : 'N/A'}</td>
+                                    <td className="p-2 text-right"><button onClick={() => setSelectedEndpoint(e)} className="text-cyan-400 hover:text-cyan-300 text-xs">Details</button></td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -167,42 +196,38 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                
-                <div className="flex flex-col gap-6">
-                    <RadialWidget title="Disk I/O Activity" value={diskIO} color="sky" />
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex-grow">
-                         <h3 className="text-slate-300 font-semibold mb-3">System Event Logs</h3>
-                         <div className="overflow-y-auto h-40 space-y-2 text-xs font-mono pr-2">
-                            {logs.map((log, i) => (
-                                <p key={i}><span className="text-slate-500 mr-2">{log.timestamp}</span><span className={`${getLogLevelColor(log.level)} font-bold mr-2`}>{log.level}</span><span>{log.message}</span></p>
-                            ))}
-                         </div>
-                    </div>
-                </div>
             </main>
         
-            {selectedProcess && (
-                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setSelectedProcess(null)}>
-                    <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+            {selectedEndpoint && (
+                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setSelectedEndpoint(null)}>
+                    <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-cyan-400">{selectedProcess.name}</h2>
-                            <button onClick={() => setSelectedProcess(null)} className="text-slate-400 hover:text-white">&times;</button>
+                            <h2 className="text-xl font-bold text-cyan-400 truncate pr-4">{selectedEndpoint.url}</h2>
+                            <button onClick={() => setSelectedEndpoint(null)} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
                         </div>
-                        <div className="space-y-3 text-sm">
-                            <p><strong>PID:</strong> <span className="font-mono">{selectedProcess.pid}</span></p>
-                            <p><strong>User:</strong> <span className="font-mono">{selectedProcess.user}</span></p>
-                            <p><strong>Status:</strong> <span className={`px-2 py-1 text-xs rounded-full ${selectedProcess.status === 'Running' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{selectedProcess.status}</span></p>
-                            <p><strong>CPU Usage:</strong> <span className="font-mono">{selectedProcess.cpu.toFixed(2)}%</span></p>
-                            <p><strong>Memory Usage:</strong> <span className="font-mono">{selectedProcess.mem.toFixed(2)}%</span></p>
-                            <div className="pt-2">
-                                <h4 className="font-semibold text-slate-300 mb-2">Mock Details:</h4>
+                        <div className="space-y-4 text-sm max-h-[70vh] overflow-y-auto">
+                           <p><strong>Status:</strong> <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(selectedEndpoint.status)}`}>{selectedEndpoint.status} {selectedEndpoint.statusCode && `(${selectedEndpoint.statusCode})`}</span></p>
+                           <p><strong>Latency:</strong> <span className="font-mono">{selectedEndpoint.latency}ms</span></p>
+                           <p><strong>Timestamp:</strong> <span className="font-mono">{selectedEndpoint.timestamp}</span></p>
+                           {selectedEndpoint.error && <p><strong>Error:</strong> <span className="font-mono text-red-400">{selectedEndpoint.error}</span></p>}
+                           
+                           {selectedEndpoint.headers && (
+                             <div>
+                                <h4 className="font-semibold text-slate-300 mb-2">Response Headers:</h4>
                                 <pre className="bg-slate-900/50 p-3 rounded-md text-slate-400 text-xs overflow-x-auto">
-                                    PATH: /usr/bin/{selectedProcess.name.toLowerCase().split('.')[0]}<br/>
-                                    START TIME: {new Date(Date.now() - Math.random() * 1000000).toUTCString()}<br/>
-                                    NETWORK CONNECTIONS: {(Math.random() * 5).toFixed(0)} active<br/>
-                                    OPEN FILES: {(Math.random() * 20).toFixed(0)}
+                                    {JSON.stringify(selectedEndpoint.headers, null, 2)}
                                 </pre>
                             </div>
+                           )}
+                           {selectedEndpoint.bodyPreview && (
+                             <div>
+                                <h4 className="font-semibold text-slate-300 mb-2">Response Body Preview:</h4>
+                                <pre className="bg-slate-900/50 p-3 rounded-md text-slate-400 text-xs overflow-x-auto whitespace-pre-wrap">
+                                    {selectedEndpoint.bodyPreview}
+                                </pre>
+                            </div>
+                           )}
+
                         </div>
                     </div>
                 </div>

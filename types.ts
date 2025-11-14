@@ -1,6 +1,6 @@
-
 // --- New Types for System Analysis Dashboard ---
 
+// FIX: Added missing Process and LogEntry types used by geminiService.ts.
 export interface Process {
   pid: number;
   name: string;
@@ -10,23 +10,27 @@ export interface Process {
   status: 'Running' | 'Suspended';
 }
 
-export interface SystemMetricPoint {
-  time: number; // timestamp
-  value: number; // percentage
-}
-
 export interface LogEntry {
   timestamp: string;
   level: 'INFO' | 'WARN' | 'ERROR';
   message: string;
 }
 
+export interface MonitoredEndpoint {
+  id: string; // unique ID for mapping
+  url: string;
+  status: 'OK' | 'Error' | 'Pending';
+  statusCode?: number;
+  latency?: number; // in ms
+  timestamp: string;
+  headers?: Record<string, string>;
+  bodyPreview?: string;
+  error?: string;
+}
 
 // --- Types for Vault / Encryption feature ---
-// FIX: Added missing Page type for navigation.
 export type Page = 'home' | 'encrypt' | 'decrypt';
 
-// FIX: Added missing VaultFile and VaultContent types for the encryption feature.
 export interface VaultFile {
   name: string;
   type: string;
@@ -41,15 +45,14 @@ export interface VaultContent {
 
 // --- Boilerplate AI Studio Types ---
 
-// FIX: Moved AIStudio interface into `declare global` and removed export to resolve declaration conflict error for window.aistudio.
-// FIX: Refactored to define AIStudio interface outside of the global scope to prevent naming collisions.
-interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
+// This makes AIStudio a global type and prevents conflicts when the file is included in multiple compilation contexts.
 declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
   interface Window {
-    aistudio: AIStudio;
+    aistudio?: AIStudio;
   }
 }
