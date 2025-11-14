@@ -1,0 +1,5 @@
+{
+  "name": "Secure Vault",
+  "description": "A client-side application for encrypting notes and files securely in your browser. It uses the Web Crypto API (AES-GCM) to ensure your data is kept private. No data is ever sent to a server.",
+  "requestFramePermissions": []
+}
