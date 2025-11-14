@@ -6,17 +6,7 @@ import ApiKeySelector from './ApiKeySelector';
 // Assume window.aistudio is available.
 // The AIStudio interface and window.aistudio declaration are moved to types.ts to avoid conflicts.
 
-// FIX: Moved AIStudio interface and global declaration here from types.ts to resolve global type conflicts.
-interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
-declare global {
-  interface Window {
-    aistudio: AIStudio;
-  }
-}
+// FIX: Removed AIStudio interface and global declaration from here to resolve global type conflicts. It is now in types.ts.
 
 const App: React.FC = () => {
   const [isKeySelected, setIsKeySelected] = useState<boolean | null>(null);

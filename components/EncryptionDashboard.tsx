@@ -1,11 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import type { Page, VaultContent, VaultFile } from '../types';
-import { encryptAndPackage } from '../services/geminiService'; // Repurposed for cryptoService
+import { encryptAndPackage } from '../services/appServices';
 
-// FIX: Made onNavigate optional and added onKeySelected to support different parent components.
 interface EncryptionDashboardProps {
-  onNavigate?: (page: Page) => void;
-  onKeySelected?: () => void;
+  onNavigate: (page: Page) => void;
 }
 
 interface FileWithProgress {
@@ -55,13 +53,13 @@ const PasswordInput: React.FC<{id: string, value: string, onChange: (e: React.Ch
                 value={value}
                 onChange={onChange}
                 placeholder={placeholder}
-                className="w-full p-3 pr-10 bg-gray-900 border border-gray-600 rounded-md text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                className="w-full p-3 pr-10 bg-slate-900 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition"
                 disabled={disabled}
             />
             <button
                 type="button"
                 onClick={() => setIsVisible(!isVisible)}
-                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-200"
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-slate-200"
                 aria-label={isVisible ? 'Hide password' : 'Show password'}
             >
                 {isVisible ? (
@@ -147,41 +145,40 @@ const EncryptionDashboard: React.FC<EncryptionDashboardProps> = ({ onNavigate })
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
-       {/* FIX: Used optional chaining to safely call onNavigate. */}
-       <button onClick={() => onNavigate?.('home')} className="text-blue-400 hover:text-blue-300">&larr; Back to Home</button>
-      <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-6 space-y-6">
+       <button onClick={() => onNavigate('home')} className="text-cyan-400 hover:text-cyan-300">&larr; Back to Vault Home</button>
+      <div className="bg-slate-800/50 border border-slate-700 rounded-lg shadow-xl p-6 space-y-6">
         <h2 className="text-2xl font-bold text-white">Create a New Secure Vault</h2>
         
         <div>
-            <label htmlFor="note" className="block text-sm font-medium text-gray-300 mb-2">Secure Note (Optional)</label>
+            <label htmlFor="note" className="block text-sm font-medium text-slate-300 mb-2">Secure Note (Optional)</label>
             <textarea
                 id="note"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Write any sensitive information here..."
-                className="w-full h-40 p-3 bg-gray-900 border border-gray-600 rounded-md text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                className="w-full h-40 p-3 bg-slate-900 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition"
                 disabled={isEncrypting}
             />
         </div>
 
         <div>
-            <label htmlFor="files" className="block text-sm font-medium text-gray-300 mb-2">Upload Files (Optional)</label>
+            <label htmlFor="files" className="block text-sm font-medium text-slate-300 mb-2">Upload Files (Optional)</label>
             <input
                 id="files"
                 type="file"
                 multiple
                 onChange={handleFileChange}
-                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-50"
+                className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-50"
                 disabled={isEncrypting}
             />
             {files.length > 0 && (
                 <ul className="mt-4 space-y-2 max-h-40 overflow-y-auto pr-2">
                     {files.map((fileWithProgress, index) => (
-                        <li key={index} className="text-sm text-gray-300 bg-gray-700 p-2 rounded-md">
+                        <li key={index} className="text-sm text-slate-300 bg-slate-700 p-2 rounded-md">
                              <div className="flex justify-between items-center">
                                 <span className="truncate pr-2">{fileWithProgress.file.name}</span>
                                 {isEncrypting && fileWithProgress.progress < 100 && (
-                                <span className="text-xs text-gray-400 flex-shrink-0">{fileWithProgress.progress}%</span>
+                                <span className="text-xs text-slate-400 flex-shrink-0">{fileWithProgress.progress}%</span>
                                 )}
                                 {isEncrypting && fileWithProgress.progress === 100 && (
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -190,7 +187,7 @@ const EncryptionDashboard: React.FC<EncryptionDashboardProps> = ({ onNavigate })
                                 )}
                             </div>
                             {isEncrypting && (
-                                <div className="w-full bg-gray-600 rounded-full h-1.5 mt-1">
+                                <div className="w-full bg-slate-600 rounded-full h-1.5 mt-1">
                                     <div 
                                         className="bg-blue-500 h-1.5 rounded-full transition-all duration-150 ease-linear" 
                                         style={{ width: `${fileWithProgress.progress}%` }}
@@ -203,17 +200,17 @@ const EncryptionDashboard: React.FC<EncryptionDashboardProps> = ({ onNavigate })
             )}
         </div>
 
-        <hr className="border-gray-600" />
+        <hr className="border-slate-600" />
         
         <div className="space-y-4">
              <h3 className="text-lg font-semibold text-white">Set a Password</h3>
-             <p className="text-sm text-gray-400">This password protects your vault key. You will need it to decrypt your vault later. <strong className="text-yellow-400">Do not forget it.</strong></p>
+             <p className="text-sm text-slate-400">This password protects your vault key. You will need it to decrypt your vault later. <strong className="text-yellow-400">Do not forget it.</strong></p>
              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">Password (min. 8 characters)</label>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">Password (min. 8 characters)</label>
                 <PasswordInput id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter a strong password" disabled={isEncrypting} />
             </div>
              <div>
-                <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-300 mb-2">Confirm Password</label>
+                <label htmlFor="confirm-password" className="block text-sm font-medium text-slate-300 mb-2">Confirm Password</label>
                 <PasswordInput id="confirm-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm your password" disabled={isEncrypting} />
             </div>
         </div>
@@ -223,7 +220,7 @@ const EncryptionDashboard: React.FC<EncryptionDashboardProps> = ({ onNavigate })
         <button
             onClick={handleEncrypt}
             disabled={isButtonDisabled}
-            className="w-full flex justify-center items-center py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-colors"
+            className="w-full flex justify-center items-center py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-colors"
         >
             {isEncrypting ? (
                  <>

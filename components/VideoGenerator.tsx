@@ -1,8 +1,10 @@
 import React from 'react';
 import type { Page } from '../types';
 
+// FIX: Made onNavigate optional and added onApiKeyError to support different parent components.
 interface HomePageProps {
-  onNavigate: (page: Page) => void;
+  onNavigate?: (page: Page) => void;
+  onApiKeyError?: () => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
@@ -20,13 +22,15 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </p>
         <div className="flex flex-col md:flex-row gap-4">
             <button
-            onClick={() => onNavigate('encrypt')}
+            // FIX: Used optional chaining to safely call onNavigate.
+            onClick={() => onNavigate?.('encrypt')}
             className="flex-1 px-6 py-4 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500 transition-colors duration-200"
             >
             Create New Vault
             </button>
             <button
-            onClick={() => onNavigate('decrypt')}
+            // FIX: Used optional chaining to safely call onNavigate.
+            onClick={() => onNavigate?.('decrypt')}
             className="flex-1 px-6 py-4 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 transition-colors duration-200"
             >
             Open Existing Vault

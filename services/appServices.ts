@@ -1,4 +1,3 @@
-
 import type { Process, LogEntry, VaultContent } from '../types';
 
 const processNames = ['kernel_task', 'svchost.exe', 'systemd', 'chrome.exe', 'node', 'python3', 'containerd', 'dockerd', 'Code.exe', 'sshd', 'nginx', 'postgres'];
@@ -31,7 +30,6 @@ export const mockDataService = {
             user: users[Math.floor(Math.random() * users.length)],
             cpu: getRandom(0.1, 15),
             mem: getRandom(0.5, 10),
-            // FIX: Explicitly cast status to match the Process['status'] type.
             status: (Math.random() > 0.1 ? 'Running' : 'Suspended') as Process['status'],
         })).sort((a,b) => b.cpu - a.cpu);
     },
@@ -48,7 +46,6 @@ export const mockDataService = {
     }
 };
 
-// FIX: Add missing `encryptAndPackage` function needed by ApiKeySelector.tsx.
 export const encryptAndPackage = async (vaultContent: VaultContent, password: string): Promise<{encryptedBlob: Blob, keyJsonString: string}> => {
   // This is a mock implementation. In a real app, this would involve actual cryptography.
   console.log('Mock encrypting vault with password:', password ? '******' : '(empty)');
@@ -67,4 +64,37 @@ export const encryptAndPackage = async (vaultContent: VaultContent, password: st
   await new Promise(resolve => setTimeout(resolve, 1500));
 
   return { encryptedBlob, keyJsonString };
+};
+
+export const decryptAndUnpackage = async (
+  encryptedBlob: Blob,
+  keyJsonString: string,
+  password: string
+): Promise<VaultContent> => {
+  // This is a mock implementation.
+  console.log('Mock decrypting vault with password:', password ? '******' : '(empty)');
+
+  // Simulate reading and parsing files
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  const keyData = JSON.parse(keyJsonString);
+  const encryptedText = await encryptedBlob.text();
+
+  // "Validate" password using the hint
+  const passwordHint = `Starts with '${password.slice(0, 1)}', ends with '${password.slice(-1)}'`;
+  if (!password || keyData.passwordHint !== passwordHint) {
+      throw new Error("Invalid password or corrupt key file.");
+  }
+  
+  // "Decrypt" the content
+  if (!encryptedText.startsWith('--- MOCK ENCRYPTED DATA ---\n')) {
+      throw new Error("Invalid or corrupt vault file.");
+  }
+
+  const contentString = encryptedText.replace('--- MOCK ENCRYPTED DATA ---\n', '');
+  
+  // Simulate an async decryption process
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
+  return JSON.parse(contentString) as VaultContent;
 };
